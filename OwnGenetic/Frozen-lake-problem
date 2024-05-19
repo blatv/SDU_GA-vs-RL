@@ -1,0 +1,74 @@
+import gym
+import matplotlib.pyplot as plt
+import numpy as np
+
+learning_rate = 0.01
+discount_factor = 0.99
+episodes = 1000
+
+class Policy:
+  def __init__(self, state_size, action_size):
+    self.weights = np.random.rand(state_size, action_size)
+
+  def predict(self, state):
+    scores = np.dot(state, self.weights)
+    exp_scores = np.exp(scores)
+    return exp_scores / np.sum(exp_scores, axis=0, keepdims=True)
+
+def visualize_lander(state):
+  # Simple visualization of the lander (replace with your preferred library)
+  # Assuming state has 6 elements (x, y, vx, vy, angle, ang_vel)
+  x, y, vx, vy, angle, ang_vel = state[:6]  # Access first 6 elements
+  plt.cla()
+  plt.text(x, y + 0.5, f"Vel:({vx:.2f},{vy:.2f})", ha='center', va='center')
+  arrow1 = plt.Polygon([(x, y), (x + 0.2 * np.cos(angle), y + 0.2 * np.sin(angle))], color='black')
+  plt.gca().add_artist(arrow1)
+  plt.plot([-1.5, 1.5], [-0.1, -0.1], color='gray')  # Landing pad
+  plt.xlim([-1.6, 1.6])
+  plt.ylim([-1, 1])
+  plt.pause(0.01)
+
+env = gym.make('LunarLander-v2')
+state = env.reset()[0]  # Get a sample state to determine its size
+
+# Check state size based on Gym version or custom wrapper
+state_size = len(state)  # Dynamically determine state size
+
+policy = Policy(state_size, env.action_space.n)
+
+for episode in range(episodes):
+  state = env.reset()[0]
+  rewards = []
+  actions = []
+
+  while True:
+    # Render environment for visualization
+    visualize_lander(state)
+
+    # Predict action probabilities
+    probs = policy.predict(state)
+
+    # Sample action based on probabilities
+    action = np.random.choice(env.action_space.n, p=probs)
+    actions.append(action)
+
+    # Take action and observe reward
+    next_state, reward, done, _,_ = env.step(action)
+    rewards.append(reward)
+
+    # Update policy (REINFORCE)
+    if done:
+      # Calculate discounted sum of rewards
+      G = np.sum([r * discount_factor**i for i, r in enumerate(rewards)])
+
+      # Update policy weights based on rewards and action probabilities
+      for i in range(len(actions)):
+        log_prob = np.log(probs[i, actions[i]])
+        policy.weights += learning_rate * G * state[i, :] * log_prob
+
+      # Reset environment for next episode
+      break
+
+    state = next_state
+
+env.close()
